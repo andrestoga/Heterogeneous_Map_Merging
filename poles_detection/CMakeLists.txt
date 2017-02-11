@@ -194,4 +194,4 @@ target_link_libraries(TestingTimes ${catkin_LIBRARIES})
 
 add_executable(poles_detection src/poles_detection.cpp)
 target_link_libraries(poles_detection ${catkin_LIBRARIES})
-add_dependencies(poles_detection poles_detection_generate_messages_cpp)
+add_dependencies(poles_detection mrpt_msgs_generate_messages_cpp)

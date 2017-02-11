@@ -149,6 +149,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 add_executable(corner_detector src/corner_detector.cpp)
 target_link_libraries(corner_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_dependencies(corner_detector mrpt_msgs_generate_messages_cpp)
 
 #############
 ## Install ##
