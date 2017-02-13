@@ -258,6 +258,7 @@ void local_map_angleCallback( const local_map::robot_map_angle::ConstPtr& msg )
       corner_robot_angle = msg->robot_angle;
       Wrapper_Corner_Harris( tmp, Corners_obs, corner_robot_angle );
       pub_map_corners.publish( MatToOGMmsg( tmp, msg->map ) );
+      Publish_Corners_To_SLAM_Backend( Corners_obs );
     }
   }
 }

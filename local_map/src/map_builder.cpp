@@ -294,6 +294,7 @@ void MapBuilder::grow(const sensor_msgs::LaserScan& scan)
       ROS_ERROR("%s", ex.what());
       has_frame_id_ = false;
     }
+    
     xinit_ = transform.getOrigin().x();
     yinit_ = transform.getOrigin().y();
     last_xmap_ = lround(xinit_ / map_.info.resolution);
@@ -327,7 +328,7 @@ void MapBuilder::grow(const sensor_msgs::LaserScan& scan)
   const double y = new_tr.getOrigin().y() - yinit_;
   const double theta = angleFromQuaternion(new_tr.getRotation());
 
-  SaveAngle( "/home/andrestoga/ros_Map_Merging/local_map_angle.txt", theta );
+  // SaveAngle( "/home/andrestoga/ros_Map_Merging/local_map_angle.txt", theta );
 
   robot_Rotation_Angle = theta;
 
