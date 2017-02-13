@@ -329,9 +329,11 @@ void MapBuilder::grow(const sensor_msgs::LaserScan& scan)
 
   SaveAngle( "/home/andrestoga/ros_Map_Merging/local_map_angle.txt", theta );
 
+  robot_Rotation_Angle = theta;
+
   // Get the pixel displacement of the map.
-  const long int xmap = lround(x / map_.info.resolution);
-  const long int ymap = lround(y / map_.info.resolution);
+  const long int xmap = lround( x / map_.info.resolution );
+  const long int ymap = lround( y / map_.info.resolution );
   const long int map_dx = xmap - last_xmap_;
   const long int map_dy = ymap - last_ymap_;
 

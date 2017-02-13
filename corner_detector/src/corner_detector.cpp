@@ -16,6 +16,8 @@
 #include "opencv2/imgproc/imgproc.hpp"
 
 #include "nav_msgs/Odometry.h"
+#include "nav_msgs/OccupancyGrid.h"
+#include <local_map/robot_map_angle.h>
 
 #include <iostream>
 #include <stdio.h>
@@ -47,6 +49,7 @@ const int map_x = 200;
 const int map_y = 200;
 
 ros::Publisher chatter_pub;
+ros::Publisher pub_map_corners;
 
 bool isMoving = false;
 bool isMovingPrev = false;
@@ -59,6 +62,9 @@ bool isTimerActivated = false;
 
 const int rnd = 1000;
 
+nav_msgs::OccupancyGrid MatToOGMmsg( cv::Mat& mat_map, nav_msgs::OccupancyGrid ogm_map );
+cv::Mat ReadMatFromVector( std::vector< signed char > v );
+void local_map_angleCallback(const local_map::robot_map_angle::ConstPtr& msg);
 void FrontEndSLAM_DetectCorners();
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg);
 double CalculateAngleVec( int x1, int y1, int x2, int y2);
@@ -85,22 +91,24 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "corner_detector");
   ros::NodeHandle n;
-  ros::ServiceClient client = n.serviceClient<local_map::SaveMap>("/local_map/save_map");
+  // ros::ServiceClient client = n.serviceClient<local_map::SaveMap>("/local_map/save_map");
   chatter_pub = n.advertise<mrpt_msgs::ObservationRangeBearing>("landmark", 1000);
-  ros::Subscriber sub3 = n.subscribe("odom", 1000, odomCallback);
+  pub_map_corners = n.advertise< nav_msgs::OccupancyGrid >( "map_corners", 1000 );
+  ros::Subscriber sub3 = n.subscribe( "odom", 1000, odomCallback );
+  ros::Subscriber sub_local_map_angle = n.subscribe( "local_map/local_map_angle", 1000, local_map_angleCallback );
   local_map::SaveMap srv;
 
-  srv.request.name = "local_map.txt";
+  // srv.request.name = "local_map.txt";
 
   // ros::Rate loop_rate(10);
 
-  // while (ros::ok())
-  // {
+  while ( ros::ok() )
+  {
     // if (client.call(srv))
     // {
     //   ROS_INFO("Success! Map saved");
 
-      FrontEndSLAM_DetectCorners();
+      // FrontEndSLAM_DetectCorners();
     // }
     // else
     // {
@@ -111,12 +119,147 @@ int main(int argc, char **argv)
 
     // ROS_INFO("Here");
 
-  //   ros::spinOnce();
+    ros::spinOnce();
 
-  //   loop_rate.sleep();
-  // }
+    // loop_rate.sleep();
+  }
 
   return 0;
+}
+
+nav_msgs::OccupancyGrid MatToOGMmsg( cv::Mat& mat_map, nav_msgs::OccupancyGrid ogm_map )
+{
+  nav_msgs::OccupancyGrid new_ogm_map;
+  std::string map_frame_id_;
+
+  map_frame_id_ = ros::this_node::getName() + "/local_map";
+  new_ogm_map.header.frame_id = map_frame_id_;
+  new_ogm_map.info.width = ogm_map.info.width;
+  new_ogm_map.info.height = ogm_map.info.height;
+  new_ogm_map.info.resolution = ogm_map.info.resolution;
+  new_ogm_map.info.origin.position.x = ogm_map.info.origin.position.x;
+  new_ogm_map.info.origin.position.y = ogm_map.info.origin.position.y;
+  new_ogm_map.info.origin.orientation.w = ogm_map.info.origin.orientation.w;
+  new_ogm_map.data.assign(new_ogm_map.info.width * new_ogm_map.info.height, -1);
+
+  // ogm_map.data.clear();
+
+  int nRows = mat_map.rows;
+  int nCols = mat_map.cols;
+
+  if ( mat_map.isContinuous() )
+  {
+      nCols *= nRows;
+      nRows = 1;
+  }
+
+  int i,j;
+  uchar* p;
+
+  for( i = 0; i < nRows; ++i )
+  {
+    p = mat_map.ptr< uchar >( i );
+
+    for ( j = 0; j < nCols; ++j )
+    {
+      // p[ j ] = table[ p[ j ] ];
+      // ogm_map.data[ i*nCols + j ] = ;
+
+      if ( p[ j ] == 0 )
+      {
+        // out.at<unsigned char>(temprow, tempcol) = 0;
+        new_ogm_map.data[ i*nCols + j ] = 100;
+      }
+      else if( p[ j ] == 255)
+      {
+        // out.at<unsigned char>(temprow, tempcol) = 255;
+        new_ogm_map.data[ i*nCols + j ] = 0;
+      }
+      // else
+      // {
+      //   // out.at<unsigned char>(temprow, tempcol) = 127;
+      //   new_ogm_map.data[ i*nCols + j ] = -1;
+      // }
+    }
+  }
+
+  return new_ogm_map;
+}
+
+cv::Mat ReadMatFromVector( std::vector< signed char > v )
+{
+  int m;
+  // Mat out = cv::Mat::zeros(rows, cols, CV_64FC1);//Matrix to store values
+  //Rows and columns
+  cv::Mat out = cv::Mat::zeros(map_y, map_x, CV_8UC1);//Matrix to store values
+
+  int cnt = 0;//index starts from 0
+
+  for (std::vector<signed char>::iterator it = v.begin(); it != v.end(); ++it)
+  {
+
+    int temprow = cnt / map_x;
+    int tempcol = cnt % map_x;
+
+    if ( *it == 100 )
+    {
+      out.at<unsigned char>(temprow, tempcol) = 0;
+    }
+    else if( *it == 0)
+    {
+      out.at<unsigned char>(temprow, tempcol) = 255;
+    }
+    else
+    {
+      out.at<unsigned char>(temprow, tempcol) = 127;
+    }
+
+    cnt++;
+  }
+
+  return out;
+}
+
+void local_map_angleCallback( const local_map::robot_map_angle::ConstPtr& msg )
+{
+  std::vector<cv::Point> corners;
+  std::vector<Corner_obs> Corners_obs;
+  double corner_robot_angle = 0.0;
+
+  if(changeState == true)
+  {
+    /* Activate the timer */
+    DelayStartTime = ros::Time::now();
+    DelayDuration = ros::Duration(DURATION);
+    isTimerActivated = true;
+    changeState = false;
+  }
+  else if(!isMoving)
+  {
+    if (isTimerActivated)
+    {
+      int elapsedTime = ros::Time::now().sec - DelayStartTime.sec;
+
+      //Checking if it has passed the duration of the rotation.
+      if(elapsedTime >= DelayDuration.sec)
+      {
+        // DetectObstacles(msg->ranges, msg->range_min, msg->range_max);
+        // BuildMsg(msg);
+        isTimerActivated = false;
+      }
+
+      ROS_INFO_STREAM("Current time: " << elapsedTime);
+      // std::cout << "Current time: " << elapsedTime << std::endl;
+    }
+    else
+    {
+      cv::Mat tmp = ReadMatFromVector( msg->map.data );
+      // imwrite( "/home/andrestoga/ros_Map_Merging/map_image.jpg", tmp );
+      corner_robot_angle = msg->robot_angle;
+      Wrapper_Corner_Harris( tmp, Corners_obs, corner_robot_angle );
+      pub_map_corners.publish( MatToOGMmsg( tmp, msg->map ) );
+    }
+  }
 }
 
 void FrontEndSLAM_DetectCorners()
@@ -212,7 +355,7 @@ void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs
 {
   //Unit vector for the x coordinate
   int x1 = 0;
-  int y1 = 1;
+  int y1 = -1;
 
   const int world_x = 0;
   const int world_y = 0;
@@ -470,9 +613,9 @@ void Wrapper_Corner_Harris( cv::Mat& map, std::vector<Corner_obs>& Corners_obs, 
 
     ROS_INFO_STREAM("Num of corners: " << Corners_obs.size());
 
-    cv::namedWindow( map_window, CV_WINDOW_AUTOSIZE );
-    cv::moveWindow(map_window, 100, 100);
-    cv::imshow( map_window, map );
+    // cv::namedWindow( map_window, CV_WINDOW_AUTOSIZE );
+    // cv::moveWindow(map_window, 100, 100);
+    // cv::imshow( map_window, map );
  
     // // Showing the result
     // cv::namedWindow( corners_window, CV_WINDOW_AUTOSIZE );

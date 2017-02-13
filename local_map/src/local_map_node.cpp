@@ -19,6 +19,9 @@
 #include <local_map/map_builder.h>
 #include <local_map/SaveMap.h>
 
+#include <std_msgs/Float32.h>
+#include <local_map/robot_map_angle.h>
+
 //Include headers for OpenCV GUI handling
 // #include "opencv2/highgui/highgui.hpp"
 //Include headers for OpenCV Image processing
@@ -28,6 +31,7 @@
 // const int map_y = 200;
 
 ros::Publisher map_publisher;
+ros::Publisher map_angle_publisher;
 local_map::MapBuilder* map_builder_ptr;
 
 // void rotate_90n(cv::Mat const &src, cv::Mat &dst, int angle)
@@ -92,8 +96,15 @@ local_map::MapBuilder* map_builder_ptr;
 void handleLaserScan(sensor_msgs::LaserScan msg)
 {
   map_builder_ptr->grow( msg );
+
+  local_map::robot_map_angle msg_robot_map_angle;
+
+  msg_robot_map_angle.map = map_builder_ptr->getMap();
+  msg_robot_map_angle.robot_angle = map_builder_ptr->GetAngle();
+
   // AlignImageToWorldCoord( map_builder_ptr->getMap() );
   map_publisher.publish( map_builder_ptr->getMap() );
+  map_angle_publisher.publish( msg_robot_map_angle );
 }
 
 bool save_map(local_map::SaveMap::Request& req, local_map::SaveMap::Response& res)
@@ -117,8 +128,9 @@ int main(int argc, char **argv)
 
   ros::Subscriber scanHandler = nh.subscribe<sensor_msgs::LaserScan>("scan", 1, handleLaserScan);
   map_publisher = nh.advertise<nav_msgs::OccupancyGrid>("local_map", 1, true);
+  map_angle_publisher = nh.advertise<local_map::robot_map_angle>("local_map_angle", 1, true);
+
   ros::ServiceServer service = nh.advertiseService("save_map", save_map);
 
   ros::spin();
 }
-

@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   local_map
   mrpt_msgs
+  nav_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -150,6 +151,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 add_executable(corner_detector src/corner_detector.cpp)
 target_link_libraries(corner_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 add_dependencies(corner_detector mrpt_msgs_generate_messages_cpp)
+add_dependencies(corner_detector local_map_generate_messages_cpp)
 
 #############
 ## Install ##

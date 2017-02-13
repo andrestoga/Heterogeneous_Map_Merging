@@ -1,0 +1,2 @@
+nav_msgs/OccupancyGrid map
+float32 robot_angle

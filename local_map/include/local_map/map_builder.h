@@ -35,6 +35,8 @@ class MapBuilder
 
     nav_msgs::OccupancyGrid getMap() const {return map_;}
 
+    double GetAngle() const {return robot_Rotation_Angle;};
+
   private:
 
     bool updateMap(const sensor_msgs::LaserScan& scan, long int dx, long int dy, double theta);
@@ -87,6 +89,7 @@ class MapBuilder
     std::vector<double> log_odds_;  //!< log odds ratios for the binary Bayes filter
                                     //!< log_odd = log(p(x) / (1 - p(x)))
     map_ray_caster::MapRayCaster ray_caster_;  //!< Ray casting with cache.
+    double robot_Rotation_Angle;
 };
 
 /* Return the offset from row and column number for a row-major array
