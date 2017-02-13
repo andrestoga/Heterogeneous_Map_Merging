@@ -64,6 +64,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg);
 double CalculateAngleVec( int x1, int y1, int x2, int y2);
 void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs);
 void Publish_Corners_To_SLAM_Backend( std::vector<Corner_obs>& Corners_obs );
+void rotate_90n(cv::Mat const &src, cv::Mat &dst, int angle);
 cv::Mat ReadMatFromTxt(std::string filename, int rows, int cols);
 double ReadAngle(std::string pathFile);
 void Wrapper_Corner_Harris(cv::Mat& map, std::vector<Corner_obs>& Corners_obs, double corner_robot_angle);
@@ -95,18 +96,20 @@ int main(int argc, char **argv)
 
   // while (ros::ok())
   // {
-    if (client.call(srv))
-    {
-      ROS_INFO("Success! Map saved");
+    // if (client.call(srv))
+    // {
+    //   ROS_INFO("Success! Map saved");
 
       FrontEndSLAM_DetectCorners();
-    }
-    else
-    {
-      ROS_ERROR("Failed to call service save map");
+    // }
+    // else
+    // {
+    //   ROS_ERROR("Failed to call service save map");
 
-      return 1;
-    }
+    //   return 1;
+    // }
+
+    // ROS_INFO("Here");
 
   //   ros::spinOnce();
 
@@ -209,7 +212,7 @@ void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs
 {
   //Unit vector for the x coordinate
   int x1 = 0;
-  int y1 = -1;
+  int y1 = 1;
 
   const int world_x = 0;
   const int world_y = 0;
@@ -287,40 +290,75 @@ void Publish_Corners_To_SLAM_Backend( std::vector<Corner_obs>& Corners_obs )
   chatter_pub.publish(observation);
 }
 
+void rotate_90n(cv::Mat const &src, cv::Mat &dst, int angle)
+{        
+    CV_Assert(angle % 90 == 0 && angle <= 360 && angle >= -360);
+
+    if(angle == 270 || angle == -90)
+    {
+      // Rotate clockwise 270 degrees
+      cv::transpose(src, dst);
+      cv::flip(dst, dst, 0);
+    }
+    else if(angle == 180 || angle == -180)
+    {
+        // Rotate clockwise 180 degrees
+        cv::flip(src, dst, -1);
+    }
+    else if(angle == 90 || angle == -270)
+    {
+        // Rotate clockwise 90 degrees
+        cv::transpose(src, dst);
+        cv::flip(dst, dst, 1);
+    }
+    else if(angle == 360 || angle == 0 || angle == -360)
+    {
+        if(src.data != dst.data)
+        {
+            src.copyTo(dst);
+        }
+    }
+}
+
 //To read data from a text file. 
 //filename is the name of the text file
 //rows and cols show dimensions of the matrix written in the text file
 cv::Mat ReadMatFromTxt(std::string filename, int rows, int cols)
 {
-    int m;
-    // Mat out = cv::Mat::zeros(rows, cols, CV_64FC1);//Matrix to store values
-    cv::Mat out = cv::Mat::zeros(rows, cols, CV_8UC1);//Matrix to store values
+  int m;
+  // Mat out = cv::Mat::zeros(rows, cols, CV_64FC1);//Matrix to store values
+  cv::Mat out = cv::Mat::zeros(rows, cols, CV_8UC1);//Matrix to store values
 
-    std::ifstream fileStream(filename.c_str());
-    int cnt = 0;//index starts from 0
+  std::ifstream fileStream(filename.c_str());
+  int cnt = 0;//index starts from 0
 
-    while (fileStream >> m)
+  while (fileStream >> m)
+  {
+    int temprow = cnt / cols;
+    int tempcol = cnt % cols;
+
+    if ( m == 100 )
     {
-      int temprow = cnt / cols;
-      int tempcol = cnt % cols;
-
-      if ( m == 100 )
-      {
-        out.at<unsigned char>(temprow, tempcol) = 0;
-      }
-      else if( m == 0)
-      {
-        out.at<unsigned char>(temprow, tempcol) = 255;
-      }
-      else
-      {
-        out.at<unsigned char>(temprow, tempcol) = 127;
-      }
-
-      cnt++;
+      out.at<unsigned char>(temprow, tempcol) = 0;
+    }
+    else if( m == 0)
+    {
+      out.at<unsigned char>(temprow, tempcol) = 255;
+    }
+    else
+    {
+      out.at<unsigned char>(temprow, tempcol) = 127;
     }
 
-    return out;
+    cnt++;
+  }
+
+  cv::Mat dst;
+
+  rotate_90n(out, dst, -90);
+  cv::flip(dst, out, 1);     // because you can't flip in-place (leads to segfault)
+
+  return out;
 }
 
 double ReadAngle(std::string pathFile)
@@ -359,8 +397,8 @@ void Wrapper_Corner_Harris( cv::Mat& map, std::vector<Corner_obs>& Corners_obs, 
   //TODO: I don't know if it is necessary
   // cv::cvtColor( map, gray, CV_BGR2GRAY );
 
-    // cv::imshow( "corners_window", gray);
-    // cv::waitKey(0);
+  //   cv::imshow( "corners_window", gray);
+  //   cv::waitKey(0);
 
     cv::Mat dst, dst_norm, dst_norm_scaled;
     dst = cv::Mat::zeros( map.size(), CV_32FC1 );
@@ -394,32 +432,38 @@ void Wrapper_Corner_Harris( cv::Mat& map, std::vector<Corner_obs>& Corners_obs, 
     {   
         for( int i = 0; i < dst_norm.cols; i++ )
         {
-            if( (int) dst_norm.at<float>(j,i) > thresh )
+            if( ( int ) dst_norm.at<float>( j, i ) > thresh )
             {
               double range = 0.0;
               double angle = 0.0;
               Corner_obs tmp_corner;
-              cv::Point tmp_point(i, j);              
+              cv::Point tmp_point( i, j );              
 
               getInfoCorner( tmp_point, corner_robot_angle, tmp_corner );
+              Corners_obs.push_back( tmp_corner );
 
-              if ( 0 == j )
-              {
-                  candidate_corner = tmp_corner;
-              }
-              else
-              {
-                if ( EuclideanDistance(candidate_corner.x, candidate_corner.y, tmp_corner.x, tmp_corner.y) > max_radious )
-                {
-                  cv::circle( map, tmp_point, 10, cv::Scalar(255), 1, 8, 0 );
-                  Corners_obs.push_back( candidate_corner );
-                  candidate_corner = tmp_corner;
-                }
-                else
-                {
-                  cv::circle( map, tmp_point, 2, cv::Scalar(255), 1, 8, 0 );
-                }
-              }              
+              //void circle(Mat& img, Point center, int radius, const Scalar& color, int thickness=1, int lineType=8, int shift=0)
+              cv::circle( map, tmp_point, 5, cv::Scalar( 0 ), 1, 8, 0 );
+
+              //
+              // if ( 0 == j )
+              // {
+              //     candidate_corner = tmp_corner;
+              // }
+              // else
+              // {
+              //   if ( EuclideanDistance(candidate_corner.x, candidate_corner.y, tmp_corner.x, tmp_corner.y) > max_radious )
+              //   {
+              //     cv::circle( map, tmp_point, 10, cv::Scalar(255), 1, 8, 0 );
+                  // Corners_obs.push_back( candidate_corner );
+              //     candidate_corner = tmp_corner;
+              //   }
+              //   else
+              //   {
+              //     cv::circle( map, tmp_point, 2, cv::Scalar(255), 1, 8, 0 );
+              //   }
+              // }
+
             }
         }
     }

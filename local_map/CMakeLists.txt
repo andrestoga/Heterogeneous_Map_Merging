@@ -17,6 +17,8 @@ find_package(catkin REQUIRED
   tf
   )
 
+# find_package(OpenCV)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -116,12 +118,17 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   )
 
+# include_directories(${OpenCV_INCLUDE_DIRS})
+
 ## Declare a cpp library
 # add_library(map_ray_caster src/map_ray_caster.cpp)
+# add_definitions(-std=c++11)
 
 ## Declare a cpp executable
 set(SRC ${SRC} src/map_builder.cpp)
 add_executable(local_map src/local_map_node.cpp ${SRC})
+
+# target_link_libraries(local_map ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes

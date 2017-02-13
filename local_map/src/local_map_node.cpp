@@ -19,17 +19,84 @@
 #include <local_map/map_builder.h>
 #include <local_map/SaveMap.h>
 
+//Include headers for OpenCV GUI handling
+// #include "opencv2/highgui/highgui.hpp"
+//Include headers for OpenCV Image processing
+// #include "opencv2/imgproc/imgproc.hpp"
+
+// const int map_x = 200;
+// const int map_y = 200;
+
 ros::Publisher map_publisher;
 local_map::MapBuilder* map_builder_ptr;
 
+// void rotate_90n(cv::Mat const &src, cv::Mat &dst, int angle)
+// {        
+//   CV_Assert(angle % 90 == 0 && angle <= 360 && angle >= -360);
+
+//   if(angle == 270 || angle == -90)
+//   {
+//     // Rotate clockwise 270 degrees
+//     cv::transpose(src, dst);
+//     cv::flip(dst, dst, 0);
+//   }
+//   else if(angle == 180 || angle == -180)
+//   {
+//     // Rotate clockwise 180 degrees
+//     cv::flip(src, dst, -1);
+//   }
+//   else if(angle == 90 || angle == -270)
+//   {
+//     // Rotate clockwise 90 degrees
+//     cv::transpose(src, dst);
+//     cv::flip(dst, dst, 1);
+//   }
+//   else if(angle == 360 || angle == 0 || angle == -360)
+//   {
+//     if(src.data != dst.data)
+//     {
+//       src.copyTo(dst);
+//     }
+//   }
+// }
+
+// void AlignImageToWorldCoord(nav_msgs::OccupancyGrid& map_msg)
+// {
+//   // cv::Mat mat_map = cv::Mat::zeros( map_x, map_y, CV_8SC1 );
+
+//   cv::Mat mat_map = cv::Mat( map_msg.data ).reshape( 0, map_x );
+
+//   mat_map.convertTo( mat_map, CV_8SC1 );
+
+//   map_msg.data.clear();
+
+//   cv::Mat mat_map_rotated;
+//   cv::Mat mat_map_rotated_flip;
+
+//   rotate_90n( mat_map, mat_map_rotated, -90 );
+//   cv::flip( mat_map_rotated, mat_map_rotated_flip, 1 );     // because you can't flip in-place (leads to segfault)
+
+//   if ( mat_map_rotated_flip.isContinuous() )
+//   {
+//     map_msg.data.assign( mat_map_rotated_flip.datastart, mat_map_rotated_flip.dataend );
+//   }
+//   else
+//   {
+//     for ( int i = 0; i < mat_map_rotated_flip.rows; ++i )
+//     {
+//       map_msg.data.insert( map_msg.data.end(), mat_map_rotated_flip.ptr<int8_t>( i ), mat_map_rotated_flip.ptr<int8_t>( i ) + mat_map_rotated_flip.cols );
+//     }
+//   }
+// }
+
 void handleLaserScan(sensor_msgs::LaserScan msg)
 {
-  map_builder_ptr->grow(msg);
-  map_publisher.publish(map_builder_ptr->getMap());
+  map_builder_ptr->grow( msg );
+  // AlignImageToWorldCoord( map_builder_ptr->getMap() );
+  map_publisher.publish( map_builder_ptr->getMap() );
 }
 
-bool save_map(local_map::SaveMap::Request& req,
-    local_map::SaveMap::Response& res)
+bool save_map(local_map::SaveMap::Request& req, local_map::SaveMap::Response& res)
 {
   return map_builder_ptr->saveMap(req.name);
 }

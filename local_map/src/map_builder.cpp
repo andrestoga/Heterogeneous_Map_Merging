@@ -461,15 +461,35 @@ bool MapBuilder::saveMap(const std::string& name) const
 
   std::ofstream ofs;
   ofs.open(filename.c_str());
+
   if (!ofs.is_open())
   {
     ROS_ERROR("Cannot open %s", filename.c_str());
     return false;
   }
 
+  // cv::Mat out;
+
+  // AlignImageToWorldCoord(map_, out);
+
+  // for (size_t i = 0; i < map_.data.size(); ++i)
+  // {
+  //   ofs << static_cast<int>(map_.data[i]);
+
+  //   if ((i % map_.info.width) == (map_.info.width - 1))
+  //   {
+  //     ofs << "\n";
+  //   }
+  //   else
+  //   {
+  //     ofs << " ";
+  //   }
+  // }  
+
   for (size_t i = 0; i < map_.data.size(); ++i)
   {
     ofs << static_cast<int>(map_.data[i]);
+
     if ((i % map_.info.width) == (map_.info.width - 1))
     {
       ofs << "\n";
@@ -479,9 +499,41 @@ bool MapBuilder::saveMap(const std::string& name) const
       ofs << " ";
     }
   }
+
   ofs.close();
+
   return true;
 }
+
+// void AlignImageToWorldCoord(nav_msgs::OccupancyGrid& map_msg, cv::Mat& mat_map_rotated_flip)
+// {
+//   // cv::Mat mat_map = cv::Mat::zeros( map_x, map_y, CV_8SC1 );
+
+//   cv::Mat mat_map = cv::Mat( map_msg.data ).reshape( 0, map_x );
+
+//   mat_map.convertTo( mat_map, CV_8SC1 );
+
+//   // map_msg.data.clear();
+
+//   cv::Mat mat_map_rotated;
+
+//   rotate_90n( mat_map, mat_map_rotated, -90 );
+//   cv::flip( mat_map_rotated, mat_map_rotated_flip, 1 );     // because you can't flip in-place (leads to segfault)
+
+
+
+  // if ( mat_map_rotated_flip.isContinuous() )
+  // {
+  //   map_msg.data.assign( mat_map_rotated_flip.datastart, mat_map_rotated_flip.dataend );
+  // }
+  // else
+  // {
+  //   for ( int i = 0; i < mat_map_rotated_flip.rows; ++i )
+  //   {
+  //     map_msg.data.insert( map_msg.data.end(), mat_map_rotated_flip.ptr<int8_t>( i ), mat_map_rotated_flip.ptr<int8_t>( i ) + mat_map_rotated_flip.cols );
+  //   }
+  // }
+// }
 
 } // namespace local_map
 
