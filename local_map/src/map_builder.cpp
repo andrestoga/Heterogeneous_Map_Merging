@@ -130,7 +130,7 @@ MapBuilder::MapBuilder(int width, int height, double resolution) :
   map_.info.origin.position.x = -static_cast<double>(width) / 2 * resolution;
   map_.info.origin.position.y = -static_cast<double>(height) / 2 * resolution;
   map_.info.origin.orientation.w = 1.0;
-  map_.data.assign(width * height, -1);  // Fill with "unknown" occupancy.
+  map_.data.assign( width * height, -1 );  // Fill with "unknown" occupancy.
   // log_odds = log(occupancy / (1 - occupancy); prefill with
   // occupancy = 0.5, equiprobability between occupied and free.
   log_odds_.assign(width * height, 0);
@@ -276,6 +276,8 @@ void MapBuilder::grow(const sensor_msgs::LaserScan& scan)
     }
 
     world_frame_id_ = getWorldFrame(tf_listerner_, scan.header.frame_id);
+    world_frame_id_ = getWorldFrame(tf_listerner_, scan.header.frame_id);
+    // world_frame_id_ = "/odom";
     ROS_INFO_STREAM("Found world frame " << world_frame_id_);
     has_frame_id_ = true;
 

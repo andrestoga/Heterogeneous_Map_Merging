@@ -19,6 +19,8 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include <local_map/robot_map_angle.h>
 
+#include <tf/transform_broadcaster.h>
+
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,9 +46,7 @@ typedef struct Corners
 const char* map_window = "Map image";
 const char* corners_window = "Corners detected";
 
-const int thresh = 150;
-const int map_x = 200;
-const int map_y = 200;
+const int thresh = 180;
 
 ros::Publisher chatter_pub;
 ros::Publisher pub_map_corners;
@@ -63,12 +63,12 @@ bool isTimerActivated = false;
 const int rnd = 1000;
 
 nav_msgs::OccupancyGrid MatToOGMmsg( cv::Mat& mat_map, nav_msgs::OccupancyGrid ogm_map );
-cv::Mat ReadMatFromVector( std::vector< signed char > v );
+cv::Mat ReadMatFromVector( std::vector< signed char > v, int width, int height);
 void local_map_angleCallback(const local_map::robot_map_angle::ConstPtr& msg);
 void FrontEndSLAM_DetectCorners();
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg);
 double CalculateAngleVec( int x1, int y1, int x2, int y2);
-void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs);
+void getInfoCorner( cv::Point& corner, double robot_angle, Corner_obs& corner_obs, int rows, int cols );
 void Publish_Corners_To_SLAM_Backend( std::vector<Corner_obs>& Corners_obs );
 void rotate_90n(cv::Mat const &src, cv::Mat &dst, int angle);
 cv::Mat ReadMatFromTxt(std::string filename, int rows, int cols);
@@ -186,20 +186,20 @@ nav_msgs::OccupancyGrid MatToOGMmsg( cv::Mat& mat_map, nav_msgs::OccupancyGrid o
   return new_ogm_map;
 }
 
-cv::Mat ReadMatFromVector( std::vector< signed char > v )
+cv::Mat ReadMatFromVector( std::vector< signed char > v, int width, int height )
 {
   int m;
   // Mat out = cv::Mat::zeros(rows, cols, CV_64FC1);//Matrix to store values
   //Rows and columns
-  cv::Mat out = cv::Mat::zeros(map_y, map_x, CV_8UC1);//Matrix to store values
+  cv::Mat out = cv::Mat::zeros(height, width, CV_8UC1);//Matrix to store values
 
   int cnt = 0;//index starts from 0
 
   for (std::vector<signed char>::iterator it = v.begin(); it != v.end(); ++it)
   {
 
-    int temprow = cnt / map_x;
-    int tempcol = cnt % map_x;
+    int temprow = cnt / width;
+    int tempcol = cnt % width;
 
     if ( *it == 100 )
     {
@@ -253,12 +253,22 @@ void local_map_angleCallback( const local_map::robot_map_angle::ConstPtr& msg )
     }
     else
     {
-      cv::Mat tmp = ReadMatFromVector( msg->map.data );
+      cv::Mat tmp = ReadMatFromVector( msg->map.data, msg->map.info.width, msg->map.info.height );
       // imwrite( "/home/andrestoga/ros_Map_Merging/map_image.jpg", tmp );
       corner_robot_angle = msg->robot_angle;
       Wrapper_Corner_Harris( tmp, Corners_obs, corner_robot_angle );
-      pub_map_corners.publish( MatToOGMmsg( tmp, msg->map ) );
+      nav_msgs::OccupancyGrid ogm_msg = MatToOGMmsg( tmp, msg->map );
+      pub_map_corners.publish( ogm_msg );
       Publish_Corners_To_SLAM_Backend( Corners_obs );
+
+      // Update the map frame, so that it's oriented like frame named "world_frame_id_".
+      tf::Transform map_transform;
+      static tf::TransformBroadcaster tr_broadcaster_;
+      map_transform.setOrigin( tf::Vector3( 0.0, 0.0, 0.0 ) );
+      tf::Quaternion q;
+      q.setRPY( 0, 0, 0 );
+      map_transform.setRotation( q );
+      tr_broadcaster_.sendTransform( tf::StampedTransform( map_transform, ros::Time::now(), msg->map.header.frame_id, ogm_msg.header.frame_id ) );
     }
   }
 }
@@ -352,7 +362,7 @@ double CalculateAngleVec( int x1, int y1, int x2, int y2)
   return atan2(det, dot);  //atan2(y, x) or atan2(sin, cos)
 }
 
-void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs)
+void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs, int rows, int cols )
 {
   //Unit vector for the x coordinate
   int x1 = 0;
@@ -365,8 +375,8 @@ void getInfoCorner(cv::Point& corner, double robot_angle, Corner_obs& corner_obs
   double range = 0.0;
 
   //Calculating the coordinate of the corner with respect of the robot
-  int x2 = corner.x - ( map_x / 2 );
-  int y2 = ( map_y / 2 ) - corner.y;
+  int x2 = corner.x - ( cols / 2 );
+  int y2 = ( rows / 2 ) - corner.y;
 
   angle = CalculateAngleVec( x1, y1, x2, y2) - robot_angle;
   angle = angle - 1.5708;
@@ -581,9 +591,9 @@ void Wrapper_Corner_Harris( cv::Mat& map, std::vector<Corner_obs>& Corners_obs, 
               double range = 0.0;
               double angle = 0.0;
               Corner_obs tmp_corner;
-              cv::Point tmp_point( i, j );              
+              cv::Point tmp_point( i, j );
 
-              getInfoCorner( tmp_point, corner_robot_angle, tmp_corner );
+              getInfoCorner( tmp_point, corner_robot_angle, tmp_corner, map.rows, map.cols );
               Corners_obs.push_back( tmp_corner );
 
               //void circle(Mat& img, Point center, int radius, const Scalar& color, int thickness=1, int lineType=8, int shift=0)

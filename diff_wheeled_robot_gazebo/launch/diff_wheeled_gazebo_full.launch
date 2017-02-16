@@ -9,8 +9,8 @@
 
   <!-- We resume the logic in empty_world.launch -->
  <!-- <include file="$(find gazebo_ros)/launch/empty_world.launch"> -->
-  <!-- <include file="$(find poles_detection)/launch/poles_world.launch"> -->
-  <include file="$(find gazebo_ros)/launch/willowgarage_world.launch"> 
+  <include file="$(find poles_detection)/launch/poles_world.launch">
+  <!-- <include file="$(find gazebo_ros)/launch/willowgarage_world.launch">  -->
 
 <!--    <arg name="debug" value="$(arg debug)" />
     <arg name="gui" value="$(arg gui)" />

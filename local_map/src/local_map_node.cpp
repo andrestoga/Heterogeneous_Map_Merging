@@ -116,12 +116,14 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "local_map");
   ros::NodeHandle nh("~");
+  //Default was 200 for 2 meters. 1000 to get all the range from the laser which is 10 meters. Using the default resolution "0.020"
+  int dimensions = 1000;
 
   double map_width;
   double map_height;
   double map_resolution;
-  nh.param<double>("map_width", map_width, 200);
-  nh.param<double>("map_height", map_height, 200);
+  nh.param<double>("map_width", map_width, dimensions);
+  nh.param<double>("map_height", map_height, dimensions);
   nh.param<double>("map_resolution", map_resolution, 0.020);
   local_map::MapBuilder map_builder(map_width, map_height, map_resolution);
   map_builder_ptr = &map_builder;
